@@ -1,0 +1,62 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.nexuscore'
+version = '0.1.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // SQLite JDBC driver
+    implementation 'org.xerial:sqlite-jdbc:3.40.0.0'
+    
+    // JUnit 5 for testing
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.2'
+}
+
+application {
+    // Set main class
+    mainClassName = 'com.nexuscore.NexusCoreApp'
+}
+
+java {
+    // Use Java 17
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+// Set UTF-8 encoding for Java compilation
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+// Set UTF-8 encoding for Java execution
+tasks.withType(JavaExec) {
+    systemProperty 'file.encoding', 'UTF-8'
+    jvmArgs = ['-Dfile.encoding=UTF-8', '-Dsun.jnu.encoding=UTF-8']
+    standardInput = System.in
+}
+
+test {
+    useJUnitPlatform()
+}
+
+// JAR file configuration
+jar {
+    manifest {
+        attributes 'Main-Class': 'com.nexuscore.NexusCoreApp'
+    }
+    
+    // Include dependency libraries
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    
+    // Settings for duplicate files
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}

@@ -1,7 +1,9 @@
 package com.nexuscore;
 
 import com.nexuscore.database.DatabaseManager;
+import com.nexuscore.gui.NexusCoreGUI;
 import com.nexuscore.llm.LLMService;
+
 import java.util.Scanner;
 
 /**
@@ -96,8 +98,25 @@ public class NexusCoreApp {
             System.out.println("Current encoding: " + System.getProperty("file.encoding"));
             System.out.println("Default Charset: " + java.nio.charset.Charset.defaultCharset());
 
-            NexusCoreApp app = new NexusCoreApp();
-            app.startCommandLineInterface();
+            // Check if we should launch GUI or CLI
+            boolean useGui = true; // デフォルトでGUIを使用
+            for (String arg : args) {
+                if ("--cli".equals(arg) || "-c".equals(arg)) {
+                    useGui = false;
+                    break;
+                }
+            }
+
+            if (useGui) {
+                // Launch JavaFX GUI
+                System.out.println("Starting GUI mode...");
+                NexusCoreGUI.launch(NexusCoreGUI.class, args);
+            } else {
+                // Launch command-line interface
+                System.out.println("Starting CLI mode...");
+                NexusCoreApp app = new NexusCoreApp();
+                app.startCommandLineInterface();
+            }
         } catch (Exception e) {
             System.err.println("An error occurred: " + e.getMessage());
             e.printStackTrace();

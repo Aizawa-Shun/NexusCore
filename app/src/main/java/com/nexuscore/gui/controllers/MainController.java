@@ -1,6 +1,7 @@
 package com.nexuscore.gui.controllers;
 
 import com.nexuscore.database.DatabaseManager;
+import com.nexuscore.database.DatabaseManager.ConversationMessage;
 import com.nexuscore.gui.components.ChatBubble;
 import com.nexuscore.gui.dialogs.OllamaSettingsDialog;
 import com.nexuscore.llm.LLMService;
@@ -13,6 +14,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
+import java.util.List;
 import java.util.ResourceBundle;
 
 /**
@@ -28,10 +30,13 @@ public class MainController {
     private TextField userInputField;
     @FXML
     private Button sendButton;
+    @FXML
+    private CheckBox thinkModeCheckbox; // 新しいチェックボックスを参照
 
     private DatabaseManager dbManager;
     private LLMService llmService;
     private int currentConversationId;
+    private static final int HISTORY_LIMIT = 10; // 履歴で考慮するメッセージの最大数
 
     /**
      * コントローラーの初期化
@@ -86,8 +91,11 @@ public class MainController {
         // 送信ボタンを無効化
         sendButton.setDisable(true);
 
+        // Think モードのステータスをチェック
+        boolean isThinkModeEnabled = thinkModeCheckbox.isSelected();
+
         // 「入力中...」表示
-        Label typingLabel = new Label("Nexus is thinking...");
+        Label typingLabel = new Label("Nexus is " + (isThinkModeEnabled ? "thinking..." : "responding..."));
         typingLabel.setStyle("-fx-font-style: italic; -fx-text-fill: gray;");
         HBox typingBox = new HBox(typingLabel);
         typingBox.setAlignment(Pos.CENTER_LEFT);
@@ -98,36 +106,73 @@ public class MainController {
             chatScrollPane.setVvalue(1.0);
         });
 
-        // LLMの応答を取得 (ノンブロッキング)
-        llmService.sendPromptAsync(message).thenAccept(response -> {
-            // JavaFXスレッドでUIを更新
-            Platform.runLater(() -> {
-                // 「入力中...」表示を削除
-                chatBox.getChildren().remove(typingBox);
+        // Think モードに応じてLLMにプロンプトを送信
+        if (isThinkModeEnabled) {
+            // 過去の会話履歴を取得
+            List<ConversationMessage> history = dbManager.getConversationHistory(currentConversationId, HISTORY_LIMIT);
 
-                // LLM応答を表示
-                addSystemMessage("Nexus", response);
+            // 履歴付きのLLMリクエストを実行
+            llmService.sendPromptWithHistoryAsync(message, history).thenAccept(response -> {
+                // JavaFXスレッドでUIを更新
+                Platform.runLater(() -> {
+                    // 「入力中...」表示を削除
+                    chatBox.getChildren().remove(typingBox);
 
-                // データベースに保存
-                dbManager.saveMessage(currentConversationId, "LLM", response);
+                    // LLM応答を表示
+                    addSystemMessage("Nexus", response);
 
-                // 送信ボタンを再度有効化
-                sendButton.setDisable(false);
+                    // データベースに保存
+                    dbManager.saveMessage(currentConversationId, "LLM", response);
+
+                    // 送信ボタンを再度有効化
+                    sendButton.setDisable(false);
+                });
+            }).exceptionally(e -> {
+                // エラー処理
+                Platform.runLater(() -> {
+                    // 「入力中...」表示を削除
+                    chatBox.getChildren().remove(typingBox);
+
+                    // エラーメッセージを表示
+                    addSystemMessage("Nexus", "Sorry, an error occurred: " + e.getMessage());
+
+                    // 送信ボタンを再度有効化
+                    sendButton.setDisable(false);
+                });
+                return null;
             });
-        }).exceptionally(e -> {
-            // エラー処理
-            Platform.runLater(() -> {
-                // 「入力中...」表示を削除
-                chatBox.getChildren().remove(typingBox);
+        } else {
+            // 標準の応答モード
+            llmService.sendPromptAsync(message).thenAccept(response -> {
+                // JavaFXスレッドでUIを更新
+                Platform.runLater(() -> {
+                    // 「入力中...」表示を削除
+                    chatBox.getChildren().remove(typingBox);
 
-                // エラーメッセージを表示
-                addSystemMessage("Nexus", "Sorry, an error occurred: " + e.getMessage());
+                    // LLM応答を表示
+                    addSystemMessage("Nexus", response);
 
-                // 送信ボタンを再度有効化
-                sendButton.setDisable(false);
+                    // データベースに保存
+                    dbManager.saveMessage(currentConversationId, "LLM", response);
+
+                    // 送信ボタンを再度有効化
+                    sendButton.setDisable(false);
+                });
+            }).exceptionally(e -> {
+                // エラー処理
+                Platform.runLater(() -> {
+                    // 「入力中...」表示を削除
+                    chatBox.getChildren().remove(typingBox);
+
+                    // エラーメッセージを表示
+                    addSystemMessage("Nexus", "Sorry, an error occurred: " + e.getMessage());
+
+                    // 送信ボタンを再度有効化
+                    sendButton.setDisable(false);
+                });
+                return null;
             });
-            return null;
-        });
+        }
     }
 
     /**

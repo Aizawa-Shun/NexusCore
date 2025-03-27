@@ -6,6 +6,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Class that manages database operations
@@ -95,6 +97,38 @@ public class DatabaseManager {
     }
 
     /**
+     * 特定の会話のメッセージ履歴を取得するメソッド
+     * 
+     * @param conversationId 会話ID
+     * @param limit          取得するメッセージ数（最大値）
+     * @return メッセージのリスト
+     */
+    public List<ConversationMessage> getConversationHistory(int conversationId, int limit) {
+        List<ConversationMessage> messages = new ArrayList<>();
+        String sql = "SELECT sender, content FROM messages " +
+                "WHERE conversation_id = ? " +
+                "ORDER BY timestamp ASC " +
+                "LIMIT ?";
+
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, conversationId);
+            pstmt.setInt(2, limit);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    String sender = rs.getString("sender");
+                    String content = rs.getString("content");
+                    messages.add(new ConversationMessage(sender, content));
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Failed to retrieve conversation history: " + e.getMessage());
+        }
+
+        return messages;
+    }
+
+    /**
      * Method to close the database connection
      */
     public void closeConnection() {
@@ -105,6 +139,27 @@ public class DatabaseManager {
             }
         } catch (SQLException e) {
             System.err.println("Error closing connection: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 会話メッセージを表現するための内部クラス
+     */
+    public static class ConversationMessage {
+        private String sender;
+        private String content;
+
+        public ConversationMessage(String sender, String content) {
+            this.sender = sender;
+            this.content = content;
+        }
+
+        public String getSender() {
+            return sender;
+        }
+
+        public String getContent() {
+            return content;
         }
     }
 }

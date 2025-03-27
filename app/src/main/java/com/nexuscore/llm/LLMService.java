@@ -1,5 +1,8 @@
 package com.nexuscore.llm;
 
+import com.nexuscore.database.DatabaseManager;
+import com.nexuscore.database.DatabaseManager.ConversationMessage;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -18,9 +21,9 @@ public class LLMService {
 
     private String modelName;
     private String ollamaPath = "ollama"; // Assumes path is set by default
-    private int maxTokens = 2000;
+    private int maxTokens = 50;
     private float temperature = 0.7f;
-    private int timeoutSeconds = 60; // Timeout duration in seconds
+    private int timeoutSeconds = 30; // Timeout duration in seconds
 
     /**
      * Constructor
@@ -121,13 +124,60 @@ public class LLMService {
     }
 
     /**
-     * Send a prompt asynchronously (to prevent UI blocking)
+     * 過去の会話履歴を考慮して、プロンプトを送信
+     * 
+     * @param prompt              ユーザーのプロンプト
+     * @param conversationHistory 会話履歴
+     * @return LLMからの応答
+     */
+    public String sendPromptWithHistory(String prompt, List<ConversationMessage> conversationHistory) {
+        try {
+            // 会話履歴とユーザープロンプトを結合
+            StringBuilder enhancedPrompt = new StringBuilder();
+
+            // ヘッダー
+            enhancedPrompt.append(
+                    "Below is a history of past conversations.Please take this into account when answering the last question.\n\n");
+
+            // 会話履歴を追加
+            for (ConversationMessage message : conversationHistory) {
+                String role = "User".equals(message.getSender()) ? "User" : "Assistant";
+                enhancedPrompt.append(role).append(": ").append(message.getContent()).append("\n\n");
+            }
+
+            // 新しいプロンプト
+            enhancedPrompt.append("User: ").append(prompt).append("\n\n");
+            enhancedPrompt.append("Assistant: ");
+
+            System.out.println("Sending enhanced prompt with conversation history");
+            return runOllamaWithTimeout(enhancedPrompt.toString());
+        } catch (Exception e) {
+            System.err.println("Error running Ollama with history: " + e.getMessage());
+            e.printStackTrace();
+            return getFallbackResponse(prompt, e.getMessage());
+        }
+    }
+
+    /**
+     * 標準プロンプトを非同期で送信（UI非ブロッキング）
      * 
      * @param prompt User's prompt
-     * @return A CompletableFuture containing the response
+     * @return 応答を含むCompletableFuture
      */
     public CompletableFuture<String> sendPromptAsync(String prompt) {
         return CompletableFuture.supplyAsync(() -> sendPrompt(prompt));
+    }
+
+    /**
+     * 会話履歴付きのプロンプトを非同期で送信（UI非ブロッキング）
+     * 
+     * @param prompt              ユーザープロンプト
+     * @param conversationHistory 会話履歴
+     * @return 応答を含むCompletableFuture
+     */
+    public CompletableFuture<String> sendPromptWithHistoryAsync(String prompt,
+            List<ConversationMessage> conversationHistory) {
+        return CompletableFuture.supplyAsync(() -> sendPromptWithHistory(prompt, conversationHistory));
     }
 
     /**

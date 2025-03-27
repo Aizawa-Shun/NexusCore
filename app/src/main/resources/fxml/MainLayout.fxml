@@ -41,18 +41,27 @@
     
     <!-- ユーザー入力エリア -->
     <bottom>
-        <HBox spacing="10" alignment="CENTER_LEFT" 
-              style="-fx-background-color: white; -fx-border-color: #e0e0e0; -fx-border-width: 1px 0 0 0; -fx-padding: 10px;">
-            <TextField fx:id="userInputField" promptText="Type your message here..." 
-                      HBox.hgrow="ALWAYS" 
-                      style="-fx-background-radius: 20px; -fx-border-radius: 20px; -fx-border-color: #e0e0e0; -fx-border-width: 1px; -fx-padding: 8px 15px; -fx-text-fill: black;"
-                      onAction="#handleSendMessage"/>
-            <Button fx:id="sendButton" text="Send" onAction="#handleSendMessage" defaultButton="true"
-                   style="-fx-background-color: #2c3e50; -fx-text-fill: white; -fx-background-radius: 20px; -fx-padding: 8px 16px;"/>
-            <padding>
-                <Insets top="10" right="15" bottom="10" left="15"/>
-            </padding>
-        </HBox>
+        <VBox style="-fx-background-color: white; -fx-border-color: #e0e0e0; -fx-border-width: 1px 0 0 0;">
+            <!-- チェックボックスを追加 -->
+            <HBox alignment="CENTER_LEFT" style="-fx-padding: 5 15 0 15;">
+                <CheckBox fx:id="thinkModeCheckbox" text="Nexus Think" 
+                         style="-fx-text-fill: #2c3e50;">
+                    <tooltip>
+                        <Tooltip text="過去の会話履歴を考慮して応答します" />
+                    </tooltip>
+                </CheckBox>
+            </HBox>
+            
+            <!-- 入力フィールドと送信ボタン -->
+            <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-padding: 5 15 10 15;">
+                <TextField fx:id="userInputField" promptText="Type your message here..." 
+                         HBox.hgrow="ALWAYS" 
+                         style="-fx-background-radius: 20px; -fx-border-radius: 20px; -fx-border-color: #e0e0e0; -fx-border-width: 1px; -fx-padding: 8px 15px; -fx-text-fill: black;"
+                         onAction="#handleSendMessage"/>
+                <Button fx:id="sendButton" text="Send" onAction="#handleSendMessage" defaultButton="true"
+                     style="-fx-background-color: #2c3e50; -fx-text-fill: white; -fx-background-radius: 20px; -fx-padding: 8px 16px;"/>
+            </HBox>
+        </VBox>
     </bottom>
     
 </BorderPane>

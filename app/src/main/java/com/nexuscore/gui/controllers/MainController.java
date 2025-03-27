@@ -2,6 +2,7 @@ package com.nexuscore.gui.controllers;
 
 import com.nexuscore.database.DatabaseManager;
 import com.nexuscore.gui.components.ChatBubble;
+import com.nexuscore.gui.dialogs.OllamaSettingsDialog;
 import com.nexuscore.llm.LLMService;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -15,7 +16,7 @@ import javafx.stage.Stage;
 import java.util.ResourceBundle;
 
 /**
- * Controller for the main application window
+ * アプリケーションのメインウィンドウのコントローラー
  */
 public class MainController {
 
@@ -25,13 +26,15 @@ public class MainController {
     private VBox chatBox;
     @FXML
     private TextField userInputField;
+    @FXML
+    private Button sendButton;
 
     private DatabaseManager dbManager;
     private LLMService llmService;
     private int currentConversationId;
 
     /**
-     * Initializes the controller
+     * コントローラーの初期化
      */
     @FXML
     public void initialize() {
@@ -48,15 +51,16 @@ public class MainController {
         // データベースマネージャーの初期化
         dbManager = new DatabaseManager();
 
-        // LLMサービスの初期化
-        llmService = new LLMService("local-llm-model");
+        // LLMサービスの初期化（デフォルトは「llama2」モデル）
+        llmService = new LLMService("llama2");
 
         // 新しい会話を作成
         currentConversationId = dbManager.createConversation("New Conversation");
 
         // 歓迎メッセージを追加
         Platform.runLater(() -> {
-            addSystemMessage("Nexus Core", "Welcome to Nexus Core. How can I help you today?");
+            addSystemMessage("Nexus Core", "Welcome to Nexus Core. How can I help you today?\n\n" +
+                    "Note: Please configure Ollama in Settings to use your preferred local LLM model.");
         });
     }
 
@@ -79,16 +83,51 @@ public class MainController {
         // 入力フィールドをクリア
         userInputField.clear();
 
-        // LLMの応答を取得 (ノンブロッキング)
-        new Thread(() -> {
-            final String response = llmService.sendPrompt(message);
+        // 送信ボタンを無効化
+        sendButton.setDisable(true);
 
+        // 「入力中...」表示
+        Label typingLabel = new Label("Nexus is thinking...");
+        typingLabel.setStyle("-fx-font-style: italic; -fx-text-fill: gray;");
+        HBox typingBox = new HBox(typingLabel);
+        typingBox.setAlignment(Pos.CENTER_LEFT);
+        chatBox.getChildren().add(typingBox);
+
+        // 自動的に下にスクロール
+        Platform.runLater(() -> {
+            chatScrollPane.setVvalue(1.0);
+        });
+
+        // LLMの応答を取得 (ノンブロッキング)
+        llmService.sendPromptAsync(message).thenAccept(response -> {
             // JavaFXスレッドでUIを更新
             Platform.runLater(() -> {
+                // 「入力中...」表示を削除
+                chatBox.getChildren().remove(typingBox);
+
+                // LLM応答を表示
                 addSystemMessage("Nexus", response);
+
+                // データベースに保存
                 dbManager.saveMessage(currentConversationId, "LLM", response);
+
+                // 送信ボタンを再度有効化
+                sendButton.setDisable(false);
             });
-        }).start();
+        }).exceptionally(e -> {
+            // エラー処理
+            Platform.runLater(() -> {
+                // 「入力中...」表示を削除
+                chatBox.getChildren().remove(typingBox);
+
+                // エラーメッセージを表示
+                addSystemMessage("Nexus", "Sorry, an error occurred: " + e.getMessage());
+
+                // 送信ボタンを再度有効化
+                sendButton.setDisable(false);
+            });
+            return null;
+        });
     }
 
     /**
@@ -144,19 +183,14 @@ public class MainController {
      */
     @FXML
     public void handlePreferences() {
-        // 簡単な設定ダイアログ
-        Dialog<Void> dialog = new Dialog<>();
-        dialog.setTitle("Preferences");
-        dialog.setHeaderText("Application Preferences");
-
-        // 設定UI用のプレースホルダー
-        DialogPane dialogPane = dialog.getDialogPane();
-
-        // ダミーの設定コントロールを追加
-        ButtonType okButton = new ButtonType("OK", ButtonBar.ButtonData.OK_DONE);
-        dialogPane.getButtonTypes().add(okButton);
-
-        dialog.showAndWait();
+        // Ollama設定ダイアログを表示
+        OllamaSettingsDialog dialog = new OllamaSettingsDialog(llmService);
+        dialog.showAndWait().ifPresent(result -> {
+            if (result) {
+                // 設定が保存された場合、メッセージを表示
+                addSystemMessage("System", "Ollama settings updated. Using model: " + llmService.getModelName());
+            }
+        });
     }
 
     /**
@@ -167,7 +201,9 @@ public class MainController {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("About");
         alert.setHeaderText("Nexus Core");
-        alert.setContentText("Version: 0.1.0\n\nA simple interface for interacting with LLMs.");
+        alert.setContentText("Version: 0.1.0\n\n" +
+                "A simple interface for Ollama-powered local LLMs.\n\n" +
+                "Configure your Ollama models in Settings.");
 
         alert.showAndWait();
     }
